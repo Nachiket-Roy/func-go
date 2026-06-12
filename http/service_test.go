@@ -446,7 +446,7 @@ func TestHandle_OTelTracePropagation(t *testing.T) {
 			return nil
 		}
 		traceCheckedCh = make(chan struct{})
-		onHandle = func(w http.ResponseWriter, r *http.Request) {
+		onHandle       = func(w http.ResponseWriter, r *http.Request) {
 			sc := trace.SpanContextFromContext(r.Context())
 			if !sc.IsValid() {
 				t.Error("expected a valid span context from propagated trace headers, but got invalid")
