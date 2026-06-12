@@ -18,6 +18,9 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 const (
@@ -45,6 +48,14 @@ type Service struct {
 
 // New Service which service the given instance.
 func New(f any) *Service {
+	// Register W3C Trace Context propagator so that trace headers injected
+	// by Knative's queue proxy (traceparent, tracestate) are extracted and
+	// made available in the context.Context passed to the function's Handle.
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
+
 	svc := &Service{
 		f:    f,
 		stop: make(chan error),
@@ -59,7 +70,9 @@ func New(f any) *Service {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health/readiness", svc.Ready)
 	mux.HandleFunc("/health/liveness", svc.Alive)
-	mux.Handle("/", newCloudeventHandler(f)) // See implementation note
+	// Wrap with otelhttp so W3C trace context is extracted from HTTP headers
+	// and propagated into the context before the function handler is called.
+	mux.Handle("/", otelhttp.NewHandler(newCloudeventHandler(f), "handle"))
 	svc.Handler = mux
 	return svc
 }
