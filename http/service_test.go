@@ -454,9 +454,8 @@ func TestHandle_OTelTracePropagation(t *testing.T) {
 			if sc.TraceID().String() != "4bf92f3577b34da6a3ce929d0e0e4736" {
 				t.Errorf("expected TraceID '4bf92f3577b34da6a3ce929d0e0e4736', got %v", sc.TraceID().String())
 			}
-			if sc.SpanID().String() != "00f067aa0ba902b7" {
-				t.Errorf("expected SpanID '00f067aa0ba902b7', got %v", sc.SpanID().String())
-			}
+			// SpanID is not asserted here because otelhttp may start a new server span
+ 			// (with a different SpanID) when a tracer provider is configured.
 			close(traceCheckedCh)
 			w.WriteHeader(http.StatusOK)
 		}

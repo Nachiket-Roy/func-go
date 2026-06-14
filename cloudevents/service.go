@@ -11,8 +11,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"reflect"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -46,15 +48,28 @@ type Service struct {
 	stop     chan error
 }
 
+var otelOnce sync.Once
+
 // New Service which service the given instance.
 func New(f any) *Service {
 	// Register W3C Trace Context propagator so that trace headers injected
 	// by Knative's queue proxy (traceparent, tracestate) are extracted and
 	// made available in the context.Context passed to the function's Handle.
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	))
+	otelOnce.Do(func() {
+		p := otel.GetTextMapPropagator()
+		if reflect.TypeOf(p).String() != "*global.textMapPropagator" {
+			otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+				propagation.TraceContext{},
+				propagation.Baggage{},
+				p,
+			))
+		} else {
+			otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+				propagation.TraceContext{},
+				propagation.Baggage{},
+			))
+		}
+	})
 
 	svc := &Service{
 		f:    f,
